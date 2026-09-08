@@ -1,0 +1,22 @@
+{
+  "maria@demo.local": {
+    "can_submit": true,
+    "max_amount": "1000.00",
+    "currencies": ["GBP"]
+  },
+  "finance@demo.local": {
+    "can_submit": true,
+    "max_amount": "10000.00",
+    "currencies": ["GBP", "EUR", "USD"]
+  },
+  "junior@demo.local": {
+    "can_submit": true,
+    "max_amount": "1000.00",
+    "currencies": ["GBP"]
+  },
+  "blocked@demo.local": {
+    "can_submit": false,
+    "max_amount": "10000.00",
+    "currencies": ["GBP"]
+  }
+}

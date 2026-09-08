@@ -1,0 +1,20 @@
+[
+  {
+    "supplier_id": "SUP-001",
+    "supplier_name": "Northstar Office Supplies",
+    "invoice_number": "INV-1001",
+    "amount": "180.00",
+    "currency": "GBP",
+    "status": "PAID",
+    "recorded_at": "2026-08-30T10:00:00Z"
+  },
+  {
+    "supplier_id": "SUP-002",
+    "supplier_name": "Harbour IT Services",
+    "invoice_number": "INV-0900",
+    "amount": "1200.00",
+    "currency": "EUR",
+    "status": "SUBMITTED",
+    "recorded_at": "2026-08-28T11:00:00Z"
+  }
+]

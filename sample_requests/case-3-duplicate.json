@@ -1,0 +1,10 @@
+{
+  "supplier_name": "Northstar Office Supplies",
+  "supplier_id": "SUP-001",
+  "invoice_number": "INV-1001",
+  "amount": "180.00",
+  "currency": "GBP",
+  "due_date": "2026-09-30",
+  "description": "Repeated invoice number",
+  "requestor": "maria@demo.local"
+}

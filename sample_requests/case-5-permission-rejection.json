@@ -1,0 +1,10 @@
+{
+  "supplier_name": "Northstar Office Supplies",
+  "supplier_id": "SUP-001",
+  "invoice_number": "INV-2005",
+  "amount": "3500.00",
+  "currency": "GBP",
+  "due_date": "2026-09-30",
+  "description": "Within agent threshold but above requestor limit",
+  "requestor": "junior@demo.local"
+}

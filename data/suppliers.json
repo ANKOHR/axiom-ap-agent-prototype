@@ -1,0 +1,22 @@
+[
+  {
+    "supplier_id": "SUP-001",
+    "supplier_name": "Northstar Office Supplies",
+    "currencies": ["GBP"],
+    "bank_destination": {
+      "account_name": "Northstar Office Supplies",
+      "sort_code": "20-12-33",
+      "account_number": "12345678"
+    }
+  },
+  {
+    "supplier_id": "SUP-002",
+    "supplier_name": "Harbour IT Services",
+    "currencies": ["GBP", "EUR"],
+    "bank_destination": {
+      "account_name": "Harbour IT Services",
+      "sort_code": "40-16-22",
+      "account_number": "87654321"
+    }
+  }
+]

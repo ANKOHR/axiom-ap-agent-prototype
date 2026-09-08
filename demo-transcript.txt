@@ -1,0 +1,31 @@
+Command: python -m src.main --demo --audit-file audit\packaging-demo.jsonl
+
+AP/payout-agent deterministic demo
+
+CASE 1 - normal approved supplier
+  agent_decision: APPROVE_FOR_SUBMISSION
+  axiom_mock_permission: ALLOWED
+  final_outcome: ACCEPTED_BY_AXIOM_MOCK
+
+CASE 2 - unknown supplier
+  agent_decision: HUMAN_REVIEW_REQUIRED
+  axiom_mock_permission: NOT_RUN
+  final_outcome: HELD_FOR_HUMAN_REVIEW
+
+CASE 3 - duplicate invoice
+  agent_decision: BLOCKED
+  axiom_mock_permission: NOT_RUN
+  final_outcome: BLOCKED_BY_AGENT_VALIDATION
+
+CASE 4 - changed bank details
+  agent_decision: HUMAN_REVIEW_REQUIRED
+  axiom_mock_permission: NOT_RUN
+  final_outcome: HELD_FOR_HUMAN_REVIEW
+
+CASE 5 - agent approval, Axiom permission rejection
+  agent_decision: APPROVE_FOR_SUBMISSION
+  axiom_mock_permission: REJECTED
+  axiom_mock_reason: Axiom mock policy rejects the amount for this requestor.
+  final_outcome: REJECTED_BY_AXIOM_PERMISSION
+
+No real payment API was called and no money moved.

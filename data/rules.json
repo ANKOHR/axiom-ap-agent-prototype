@@ -1,0 +1,18 @@
+{
+  "required_fields": [
+    "supplier_name",
+    "invoice_number",
+    "amount",
+    "currency",
+    "due_date",
+    "requestor"
+  ],
+  "supported_currencies": ["GBP", "EUR", "USD"],
+  "approval_thresholds": {
+    "GBP": "5000.00",
+    "EUR": "5000.00",
+    "USD": "6000.00"
+  },
+  "max_decimal_places": 2,
+  "bank_detail_change_action": "HUMAN_REVIEW"
+}

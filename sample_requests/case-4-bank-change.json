@@ -1,0 +1,15 @@
+{
+  "supplier_name": "Northstar Office Supplies",
+  "supplier_id": "SUP-001",
+  "invoice_number": "INV-2004",
+  "amount": "275.00",
+  "currency": "GBP",
+  "due_date": "2026-09-30",
+  "bank_destination": {
+    "account_name": "Northstar Office Supplies",
+    "sort_code": "11-22-33",
+    "account_number": "12345678"
+  },
+  "description": "Destination differs from supplier record",
+  "requestor": "maria@demo.local"
+}

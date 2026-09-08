@@ -1,0 +1,7 @@
+Supplier: Harbour IT Services
+Supplier ID: SUP-002
+Invoice Number: INV-2006
+Amount: EUR 900.00
+Due Date: 2026-10-15
+Description: Monthly support retainer
+Requestor: finance@demo.local
