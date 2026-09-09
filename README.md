@@ -1,8 +1,8 @@
 # Axiom AP / payout-agent prototype
 
-This is a compact technical-trial prototype for an accounts-payable and payout workflow. It demonstrates how an agent can interpret an invoice, run deterministic checks, prepare a structured payout request, and record an auditable recommendation while a separate Axiom-shaped permissions adapter remains the authority over submission.
+This is a compact technical-trial prototype for an accounts-payable and payout workflow. It demonstrates how an agent can interpret an invoice, run deterministic checks, prepare a structured payout request, and record an auditable recommendation while a separate Axiom boundary remains the authority over submission.
 
-It is deliberately not a production payments system. The data is synthetic, the Axiom adapter is mocked, no credentials are used, and no money moves.
+It is deliberately not a production payments system. The original demo uses a mocked Axiom permissions adapter; a separate, explicitly invoked staging adapter is prepared for the Axiom trial. The data is synthetic, no credentials are stored, and no money moves.
 
 ## What it demonstrates
 
@@ -14,7 +14,8 @@ It is deliberately not a production payments system. The data is synthetic, the 
   - `HUMAN_REVIEW_REQUIRED`
   - `BLOCKED`
 - A structured payout request representing the payload that could later be submitted to Axiom.
-- A mocked `check_permission(...)` and `submit_payout_request(...)` boundary.
+- A mocked `check_permission(...)` and `submit_payout_request(...)` boundary for the offline demo.
+- A separate Axiom staging `payment.create` adapter with runtime passport handling, idempotency, request-ID mapping, and redacted evidence reporting.
 - Append-only JSONL audit records containing input, normalisation, checks, evidence, decision, permission result, outcome, timestamp, and request ID.
 
 ## Architecture and trust boundary
@@ -37,8 +38,8 @@ flowchart LR
 The trust boundary is intentional:
 
 - **Agent:** interprets, normalises, validates, explains, recommends, and prepares a payout request.
-- **Axiom boundary:** independently checks the requestor's authority, currency scope, and amount limit, then decides whether the proposed action may be submitted.
-- **This prototype:** simulates the Axiom boundary in memory. It does not authenticate, call a banking API, or execute a payment.
+- **Axiom boundary:** independently checks delegated authority and payment policy, then decides whether the proposed action may be submitted.
+- **This prototype:** simulates that boundary in memory for the offline demo. The prepared staging adapter hands the proposal to Axiom; it does not reproduce Axiom's final policy locally or execute a settled payment.
 
 The most important demonstration is case 5: the agent recommends submission because the amount is below its own automatic threshold, but the mocked Axiom permission layer rejects it because the requestor's permitted limit is lower. Agent reasoning is therefore not treated as execution authority.
 
@@ -70,6 +71,53 @@ Use a different audit destination when you want an isolated run:
 ```powershell
 python -m src.main --demo --audit-file audit\trial-run.jsonl
 ```
+
+## Axiom staging integration trial
+
+The staging path is prepared but has not been invoked during repository verification. It uses only the following wire contract:
+
+```json
+{
+  "action": "payment.create",
+  "params": {
+    "amount_minor": 2500,
+    "currency": "GBP",
+    "merchant_id": "merchant.acme-supplies.test",
+    "merchant_ref": "inv-allowed-001"
+  },
+  "passport": "[runtime only]"
+}
+```
+
+The adapter posts to `https://api-staging.axiomgo.ai/v1/invoke` with `Content-Type: application/json`, `Accept: application/json`, and an `Idempotency-Key` of the form `henry-ap-<agent-job-id>-<attempt-number>`. The Axiom body contains no `request_id`, `trace_id`, `correlation_id`, `client_request_id`, or `agent_job_id`. The local `agent_job_id` is retained only in the evidence report and mapped to any `request_id` returned by Axiom.
+
+The AP-side decision checks that a proposal is complete and structurally suitable for submission. It does not implement merchant allowlists, delegated-authority limits, or Axiom payment-policy rules. All five supplied proposals therefore reach the adapter; Axiom independently accepts or rejects them.
+
+The five exact trial cases are:
+
+| Scenario | Exact parameters | Expected staging outcome |
+| --- | --- | --- |
+| Allowed payment | `2500 GBP`, `merchant.acme-supplies.test`, `inv-allowed-001` | HTTP 200, accepted, test-mode dispatch |
+| Blocked merchant | `2500 GBP`, `merchant.blocked-supplier.test`, `inv-blocked-merchant-001` | HTTP 403, `payment_policy_violation`, merchant not allowed |
+| Blocked amount | `7500 GBP`, `merchant.acme-supplies.test`, `inv-blocked-amount-001` | HTTP 403, `payment_policy_violation`, limit exceeded |
+| Idempotent replay | Exact repeat of the allowed request | Replay, no duplicate dispatch |
+| Idempotency mismatch | Reuse the allowed key with `amount_minor: 7500` | Idempotency mismatch |
+
+For a safe local preview, which sends no network request and does not read the environment variable:
+
+```powershell
+python -m src.main --staging-suite --dry-run --staging-report audit\staging-dry-run.json
+```
+
+At the agreed live window, supply the short-lived passport only in the process environment, then run the same suite without `--dry-run`:
+
+```powershell
+$env:AXIOM_AGENT_PASSPORT = "<passport supplied at the live-window start>"
+python -m src.main --staging-suite --staging-report audit\staging-evidence.json
+Remove-Item Env:AXIOM_AGENT_PASSPORT
+```
+
+Never put the real value in this repository, a fixture, a screenshot, a command transcript, an exception, or an audit report. The runner makes the five calls sequentially without automatic retries, records response bodies and useful response headers only after redaction, and writes a concise JSON evidence report. The `allowed`, `idempotent replay`, and `idempotency mismatch` cases intentionally reuse the same local job ID, attempt number, and idempotency key.
 
 ## Demo scenarios
 
@@ -115,25 +163,25 @@ Run:
 python -m pytest -q
 ```
 
-The tests cover duplicate detection, supplier validation, thresholds, bank-detail mismatch, amount consistency, optional requestor policies, mock permission rejection, one-time permission tokens, end-to-end decisions, and audit generation.
+The tests cover duplicate detection, supplier validation, thresholds, bank-detail mismatch, amount consistency, optional requestor policies, mock permission rejection, one-time permission tokens, end-to-end decisions, audit generation, staging request shape, forbidden-field exclusion, idempotency keys, Axiom request-ID mapping, secret redaction, replay, and idempotency mismatch handling.
 
 ## What is mocked
 
 - The supplier allowlist, previous-invoice register, approval thresholds, and requestor policies are local JSON fixtures.
-- `MockAxiomPermissions` stands in for an Axiom permissions/control API.
+- `MockAxiomPermissions` stands in for an Axiom permissions/control API in the offline demo.
 - `check_permission` issues an in-memory, request-bound mock token.
 - `submit_payout_request` creates a mock reference only after an allowed permission check.
-- There is no network call, authentication, webhook, bank connection, payment-provider call, or real execution path.
+- The staging suite is the only network-capable path, and it is not called by the synthetic demo or tests. The staging endpoint is a test-mode integration path; there is no bank connection, settlement, webhook, or production execution path.
 
-## Replacing the mock with a real Axiom adapter
+## Axiom staging adapter boundary
 
-If Axiom provides API documentation and credentials for a sandbox, the clean replacement point is the adapter supplied to `APAgent`:
+The clean replacement point for the real trial is the separate `AxiomStagingAdapter`; the offline `APAgent` contract remains unchanged:
 
-1. Keep the `check_permission(payout_request)` and `submit_payout_request(payout_request, permission)` contract.
-2. Map the prepared `PayoutRequest` to Axiom's documented request schema without allowing the agent to add an execution bypass.
-3. Carry Axiom's real decision, policy version, approval requirements, idempotency key, and evidence identifiers into `PermissionResult` and the audit record.
-4. Treat an API acceptance response as an Axiom workflow state, not as proof that a bank has settled funds.
-5. Add sandbox contract tests for denied requestors, amount limits, duplicate/idempotency behaviour, retries, timeouts, and partial failures.
+1. Keep AP commercial suitability separate from Axiom's delegated-authority and payment-policy decisions.
+2. Map the prepared proposal to the documented `payment.create` request shape without adding an execution bypass or local copies of Axiom policy.
+3. Keep the short-lived `AXIOM_AGENT_PASSPORT` environment value in memory only for the request; persist only the redacted body and safe response evidence.
+4. Map Axiom's returned `request_id` to the local `agent_job_id`; treat acceptance as a staging workflow state, not proof that a bank has settled funds.
+5. Preserve the contract tests for denied merchants, amount limits, duplicate/idempotency behaviour, timeouts, and partial failures as the sandbox evolves.
 
 The adapter should be the only code that knows transport details, authentication, Axiom endpoint names, or Axiom-specific status codes. The deterministic agent and its tests should remain usable without credentials.
 
@@ -142,16 +190,17 @@ The adapter should be the only code that knows transport details, authentication
 - Never place production bank details or credentials in the fixture files.
 - Validate and normalise all external input before it reaches an adapter.
 - Keep duplicate detection and bank-change alerts explainable and auditable.
-- Use an idempotency key/request ID when a real submission endpoint is introduced.
+- Use the agreed idempotency key and preserve the local-to-Axiom request-ID mapping on every staging submission.
+- Keep `AXIOM_AGENT_PASSPORT` runtime-only; redaction is applied to response bodies, response headers, exceptions, console output, and reports.
 - Do not treat an agent recommendation, an API request, or an API acceptance response as proof of payment settlement.
 - Add least-privilege authentication, secret storage, TLS, replay protection, rate limits, approval segregation, and immutable/retained audit storage before any real integration.
 - Keep human approval explicit for new suppliers, bank changes, threshold exceptions, and ambiguous data.
 
 ## Obvious next steps after Axiom API access
 
-1. Replace `MockAxiomPermissions` with a sandbox adapter based on the actual permission, submission, and status schemas; preserve the same interface and add contract tests.
-2. Confirm Axiom's identity, approval, idempotency, retry, and evidence semantics, then encode them in the audit schema and failure-state handling.
-3. Run a small non-monetary or sandbox trial with agreed fixtures and review the audit trail jointly before discussing any production scope.
+1. Run the prepared five-case suite during the agreed one-hour window with the short-lived passport.
+2. Confirm Axiom's identity, approval, idempotency, retry, and evidence semantics against the returned responses and report.
+3. Review the audit trail jointly before discussing any production scope.
 
 ## Project tree
 
@@ -179,13 +228,18 @@ axiom-ap-agent/
 │       ├── __init__.py
 │       ├── agent.py
 │       ├── audit.py
+│       ├── axiom_staging.py
 │       ├── main.py
 │       ├── models.py
 │       ├── parser.py
 │       ├── permissions.py
+│       ├── staging_runner.py
+│       ├── staging_scenarios.py
 │       └── validator.py
 └── tests/
     ├── test_permissions.py
+    ├── test_staging_adapter.py
+    ├── test_staging_runner.py
     ├── test_validation.py
     └── test_workflow.py
 ```

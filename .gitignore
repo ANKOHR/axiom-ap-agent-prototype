@@ -3,3 +3,5 @@
 __pycache__/
 .pytest_cache/
 audit/*.jsonl
+audit/staging-*.json
+audit/staging-*.md

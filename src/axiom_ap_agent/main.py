@@ -9,7 +9,9 @@ from typing import Any
 
 from .agent import APAgent, WorkflowResult
 from .audit import JsonlAuditLog
+from .axiom_staging import AxiomStagingAdapter
 from .permissions import MockAxiomPermissions
+from .staging_runner import StagingEvidenceRunner, render_concise_summary
 
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]
@@ -137,13 +139,48 @@ def run_demo(audit_file: Path) -> None:
     print("\nNo real payment API was called and no money moved.")
 
 
+def run_staging_suite(report_path: Path, dry_run: bool = False) -> None:
+    runner = StagingEvidenceRunner(
+        adapter=AxiomStagingAdapter(),
+        report_path=report_path,
+        dry_run=dry_run,
+    )
+    report = runner.run()
+    print(render_concise_summary(report))
+    print(f"Evidence report: {report_path}")
+    if dry_run:
+        print("No network request was made and AXIOM_AGENT_PASSPORT was not read.")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run the AP/payout-agent prototype.")
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--demo", action="store_true", help="run the five built-in demonstration cases")
     mode.add_argument("--request", type=Path, help="read one JSON or simple-text request from a file")
+    mode.add_argument("--staging-suite", action="store_true", help="run the five Axiom staging trial scenarios")
     parser.add_argument("--audit-file", type=Path, default=Path("audit/audit.jsonl"), help="append structured JSONL audit records here")
+    parser.add_argument(
+        "--staging-report",
+        type=Path,
+        default=Path("audit/staging-evidence.json"),
+        help="write the staging suite evidence report here",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="preview the staging suite without reading the passport or using the network",
+    )
     args = parser.parse_args()
+
+    if args.dry_run and not args.staging_suite:
+        parser.error("--dry-run can only be used with --staging-suite")
+
+    if args.staging_suite:
+        staging_report = args.staging_report
+        if not staging_report.is_absolute():
+            staging_report = Path.cwd() / staging_report
+        run_staging_suite(staging_report, dry_run=args.dry_run)
+        return
 
     audit_file = args.audit_file
     if not audit_file.is_absolute():
