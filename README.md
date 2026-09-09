@@ -119,6 +119,8 @@ Remove-Item Env:AXIOM_AGENT_PASSPORT
 
 Never put the real value in this repository, a fixture, a screenshot, a command transcript, an exception, or an audit report. The runner makes the five calls sequentially without automatic retries, records response bodies and useful response headers only after redaction, and writes a concise JSON evidence report. The `allowed`, `idempotent replay`, and `idempotency mismatch` cases intentionally reuse the same local job ID, attempt number, and idempotency key.
 
+If the live command is started without `AXIOM_AGENT_PASSPORT`, it records a safe error for each case, makes no network request, and exits nonzero.
+
 ## Demo scenarios
 
 | Case | Input | Expected agent decision | Expected final outcome |

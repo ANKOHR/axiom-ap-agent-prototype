@@ -139,7 +139,7 @@ def run_demo(audit_file: Path) -> None:
     print("\nNo real payment API was called and no money moved.")
 
 
-def run_staging_suite(report_path: Path, dry_run: bool = False) -> None:
+def run_staging_suite(report_path: Path, dry_run: bool = False) -> int:
     runner = StagingEvidenceRunner(
         adapter=AxiomStagingAdapter(),
         report_path=report_path,
@@ -150,6 +150,11 @@ def run_staging_suite(report_path: Path, dry_run: bool = False) -> None:
     print(f"Evidence report: {report_path}")
     if dry_run:
         print("No network request was made and AXIOM_AGENT_PASSPORT was not read.")
+    has_error = any(
+        isinstance(record.get("http_status"), str) and record["http_status"].startswith("ERROR:")
+        for record in report["scenarios"]
+    )
+    return 1 if not dry_run and has_error else 0
 
 
 def main() -> None:
@@ -179,7 +184,9 @@ def main() -> None:
         staging_report = args.staging_report
         if not staging_report.is_absolute():
             staging_report = Path.cwd() / staging_report
-        run_staging_suite(staging_report, dry_run=args.dry_run)
+        exit_code = run_staging_suite(staging_report, dry_run=args.dry_run)
+        if exit_code:
+            raise SystemExit(exit_code)
         return
 
     audit_file = args.audit_file

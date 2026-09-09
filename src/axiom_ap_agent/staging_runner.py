@@ -151,31 +151,21 @@ class StagingEvidenceRunner:
             http_status = "NOT_SENT"
         elif decision.decision is not Decision.APPROVE_FOR_SUBMISSION:
             http_status = "NOT_SUBMITTED"
+        elif error is not None:
+            http_status = f"ERROR: {error}"
         else:
             http_status = None
         record: dict[str, Any] = {
             "scenario_label": scenario.label,
-            "scenario_key": scenario.scenario_key,
             "local_agent_job_id": job_id,
-            "attempt_number": scenario.attempt_number,
             "ap_agent_decision": decision.to_dict(),
             "redacted_request_body": preview.redacted_request_body,
-            "idempotency_key": preview.idempotency_key,
             "http_status": http_status,
             "response_body": result.response_body if call_result is not None else None,
             "response_headers": result.response_headers if call_result is not None else {},
             "axiom_request_id": result.axiom_request_id if call_result is not None else None,
             "replay_indication": result.replayed if call_result is not None else None,
-            "expected": scenario.expected,
         }
-        if error is not None:
-            record["error"] = error
-        if decision.decision is not Decision.APPROVE_FOR_SUBMISSION:
-            record["submission"] = "NOT_SUBMITTED"
-        elif self.dry_run:
-            record["submission"] = "PREVIEW_ONLY"
-        else:
-            record["submission"] = "SENT_TO_STAGING"
         return record
 
     def run(self) -> dict[str, Any]:
@@ -227,7 +217,7 @@ def render_concise_summary(report: dict[str, Any]) -> str:
         decision = scenario["ap_agent_decision"]["decision"]
         status = scenario["http_status"]
         if status is None:
-            status = scenario.get("error") or scenario.get("submission", "NOT_SENT")
+            status = "NOT_SENT"
         request_id = scenario.get("axiom_request_id") or "-"
         replay = scenario.get("replay_indication")
         replay_text = "-" if replay is None else str(replay).lower() if isinstance(replay, bool) else str(replay)

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import json
+import importlib
 from pathlib import Path
 from uuid import uuid4
+
+import pytest
 
 from src.axiom_ap_agent.axiom_staging import AxiomStagingAdapter, HttpResponse
 from src.axiom_ap_agent.staging_runner import StagingEvidenceRunner
@@ -126,12 +129,25 @@ def test_live_runner_records_all_five_outcomes_and_keeps_ap_separate(monkeypatch
         "idempotency mismatch",
     ]
     assert [record["http_status"] for record in records] == [200, 403, 403, 200, 409]
+    required_record_fields = {
+        "scenario_label",
+        "local_agent_job_id",
+        "ap_agent_decision",
+        "redacted_request_body",
+        "http_status",
+        "response_body",
+        "response_headers",
+        "axiom_request_id",
+        "replay_indication",
+    }
+    assert all(set(record) == required_record_fields for record in records)
     assert all(record["ap_agent_decision"]["decision"] == "APPROVE_FOR_SUBMISSION" for record in records)
     assert records[1]["response_body"]["error"] == "payment_policy_violation"
     assert records[2]["response_body"]["reason"] == "limit exceeded"
     assert records[3]["replay_indication"] is True
     assert records[4]["response_body"]["error"] == "idempotency_mismatch"
-    assert records[0]["idempotency_key"] == records[3]["idempotency_key"] == records[4]["idempotency_key"]
+    transport_keys = [call["headers"]["Idempotency-Key"] for call in transport.calls]
+    assert transport_keys[0] == transport_keys[3] == transport_keys[4]
     assert records[0]["local_agent_job_id"] == records[3]["local_agent_job_id"] == records[4]["local_agent_job_id"]
     assert report["local_agent_job_to_axiom_request_id"][records[0]["local_agent_job_id"]] == "axiom-req-allowed"
     assert report["passport_included"] is False
@@ -157,10 +173,29 @@ def test_dry_run_generates_five_redacted_previews_without_passport_or_network(mo
     assert report["mode"] == "dry_run"
     assert len(report["scenarios"]) == 5
     assert all(record["http_status"] == "NOT_SENT" for record in report["scenarios"])
-    assert all(record["submission"] == "PREVIEW_ONLY" for record in report["scenarios"])
     assert all(record["redacted_request_body"]["passport"] == "[REDACTED]" for record in report["scenarios"])
     assert all(record["ap_agent_decision"]["decision"] == "APPROVE_FOR_SUBMISSION" for record in report["scenarios"])
     assert report["local_agent_job_to_axiom_request_id"] == {}
     assert transport.calls == []
     assert "AXIOM_AGENT_PASSPORT" in json.dumps(report)
     assert report_path.exists()
+
+
+def test_live_cli_without_passport_exits_nonzero_after_safe_report(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.delenv("AXIOM_AGENT_PASSPORT", raising=False)
+    staging_module = importlib.import_module("src.axiom_ap_agent.axiom_staging")
+    monkeypatch.setattr(staging_module, "urlopen", lambda *args, **kwargs: pytest.fail("network call attempted"))
+    cli_module = importlib.import_module("src.axiom_ap_agent.main")
+    report_path = tmp_path / "missing-passport.json"
+    monkeypatch.setattr(
+        "sys.argv",
+        ["src.main", "--staging-suite", "--staging-report", str(report_path)],
+    )
+
+    with pytest.raises(SystemExit) as raised:
+        cli_module.main()
+
+    assert raised.value.code == 1
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert all(record["http_status"].startswith("ERROR:") for record in report["scenarios"])
+    assert report["safety"]["staging_requests_sent"] is False
