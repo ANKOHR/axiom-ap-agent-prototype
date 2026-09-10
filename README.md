@@ -82,9 +82,12 @@ The repository is ready for the governed live staging test. Start an asynchronou
 - Correlation: the local `agent_job_id` stays out of the body and is mapped to any returned Axiom `request_id`; replay and mismatch reuse the allowed case's idempotency key as specified.
 - Exact cases: allowed payment; blocked merchant; blocked amount; idempotent replay; idempotency mismatch.
 
-Credential-free preview:
+Safe offline verification:
 
 ```powershell
+python -m pytest -q
+python -m compileall -q src tests
+python -m src.main --demo --audit-file audit\offline-review.jsonl
 python -m src.main --staging-suite --dry-run --staging-report audit\staging-dry-run.json
 ```
 
