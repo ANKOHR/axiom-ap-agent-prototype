@@ -72,54 +72,23 @@ Use a different audit destination when you want an isolated run:
 python -m src.main --demo --audit-file audit\trial-run.jsonl
 ```
 
-## Axiom staging integration trial
+## Axiom staging trial readiness
 
-The staging path is prepared but has not been invoked during repository verification. It uses only the following wire contract:
+The repository is ready for the governed live staging test. Start an asynchronous review with the [technical staging-readiness report](docs/axiom-staging-readiness.md) and the [clean local dry-run transcript](docs/axiom-staging-dry-run-transcript.md); both label simulated/local evidence separately from live Axiom evidence.
 
-```json
-{
-  "action": "payment.create",
-  "params": {
-    "amount_minor": 2500,
-    "currency": "GBP",
-    "merchant_id": "merchant.acme-supplies.test",
-    "merchant_ref": "inv-allowed-001"
-  },
-  "passport": "[runtime only]"
-}
-```
+- Wire contract: `POST https://api-staging.axiomgo.ai/v1/invoke`, action `payment.create`, four payment params, required JSON/Accept/idempotency headers.
+- Trust boundary: the AP runner decides commercial suitability; Axiom independently decides delegated authority and payment policy.
+- Safety: the passport is read only from `AXIOM_AGENT_PASSPORT` at request time, redacted from evidence, and never placed in Git or generated audit files. The five cases run sequentially with no automatic retries.
+- Correlation: the local `agent_job_id` stays out of the body and is mapped to any returned Axiom `request_id`; replay and mismatch reuse the allowed case's idempotency key as specified.
+- Exact cases: allowed payment; blocked merchant; blocked amount; idempotent replay; idempotency mismatch.
 
-The adapter posts to `https://api-staging.axiomgo.ai/v1/invoke` with `Content-Type: application/json`, `Accept: application/json`, and an `Idempotency-Key` of the form `henry-ap-<agent-job-id>-<attempt-number>`. The Axiom body contains no `request_id`, `trace_id`, `correlation_id`, `client_request_id`, or `agent_job_id`. The local `agent_job_id` is retained only in the evidence report and mapped to any `request_id` returned by Axiom.
-
-The AP-side decision checks that a proposal is complete and structurally suitable for submission. It does not implement merchant allowlists, delegated-authority limits, or Axiom payment-policy rules. All five supplied proposals therefore reach the adapter; Axiom independently accepts or rejects them.
-
-The five exact trial cases are:
-
-| Scenario | Exact parameters | Expected staging outcome |
-| --- | --- | --- |
-| Allowed payment | `2500 GBP`, `merchant.acme-supplies.test`, `inv-allowed-001` | HTTP 200, accepted, test-mode dispatch |
-| Blocked merchant | `2500 GBP`, `merchant.blocked-supplier.test`, `inv-blocked-merchant-001` | HTTP 403, `payment_policy_violation`, merchant not allowed |
-| Blocked amount | `7500 GBP`, `merchant.acme-supplies.test`, `inv-blocked-amount-001` | HTTP 403, `payment_policy_violation`, limit exceeded |
-| Idempotent replay | Exact repeat of the allowed request | Replay, no duplicate dispatch |
-| Idempotency mismatch | Reuse the allowed key with `amount_minor: 7500` | Idempotency mismatch |
-
-For a safe local preview, which sends no network request and does not read the environment variable:
+Credential-free preview:
 
 ```powershell
 python -m src.main --staging-suite --dry-run --staging-report audit\staging-dry-run.json
 ```
 
-At the agreed live window, supply the short-lived passport only in the process environment, then run the same suite without `--dry-run`:
-
-```powershell
-$env:AXIOM_AGENT_PASSPORT = "<passport supplied at the live-window start>"
-python -m src.main --staging-suite --staging-report audit\staging-evidence.json
-Remove-Item Env:AXIOM_AGENT_PASSPORT
-```
-
-Never put the real value in this repository, a fixture, a screenshot, a command transcript, an exception, or an audit report. The runner makes the five calls sequentially without automatic retries, records response bodies and useful response headers only after redaction, and writes a concise JSON evidence report. The `allowed`, `idempotent replay`, and `idempotency mismatch` cases intentionally reuse the same local job ID, attempt number, and idempotency key.
-
-If the live command is started without `AXIOM_AGENT_PASSPORT`, it records a safe error for each case, makes no network request, and exits nonzero.
+The hidden-prompt live runbook, evidence fields, expected checks, and remaining Axiom-only observations are in the readiness report. If the live command starts without a passport, it fails safely before network I/O and exits nonzero.
 
 ## Demo scenarios
 
