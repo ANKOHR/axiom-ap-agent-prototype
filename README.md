@@ -1,8 +1,19 @@
 # Axiom AP / payout-agent prototype
 
+[![Axiom AP CI](https://github.com/ANKOHR/axiom-ap-agent-prototype/actions/workflows/ci.yml/badge.svg)](https://github.com/ANKOHR/axiom-ap-agent-prototype/actions/workflows/ci.yml)
+
 This is a compact technical-trial prototype for an accounts-payable and payout workflow. It demonstrates how an agent can interpret an invoice, run deterministic checks, prepare a structured payout request, and record an auditable recommendation while a separate Axiom boundary remains the authority over submission.
 
 It is deliberately not a production payments system. The original demo uses a mocked Axiom permissions adapter; a separate, explicitly invoked staging adapter is prepared for the Axiom trial. The data is synthetic, no credentials are stored, and no money moves.
+
+## 60-second reviewer path
+
+1. Read the [five-case demo transcript](demo-transcript.txt) to see the agent/review/permission outcomes immediately.
+2. Read the [staging-readiness report](docs/axiom-staging-readiness.md) for the exact execution-authority, idempotency and secret-handling boundaries.
+3. Run `python -m pytest -q` and `python -m src.main --demo` for the deterministic offline proof.
+4. Inspect [CI](https://github.com/ANKOHR/axiom-ap-agent-prototype/actions/workflows/ci.yml): tests, compile checks, the offline demo and the staging dry-run execute without credentials or real payment side effects.
+
+The key engineering point is the authority split: the agent may recommend submission, but a separate permission boundary remains authoritative over whether the action can proceed.
 
 ## What it demonstrates
 
