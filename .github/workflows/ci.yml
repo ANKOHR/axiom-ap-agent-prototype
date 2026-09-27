@@ -1,0 +1,20 @@
+name: Axiom AP CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: python -m pip install -e ".[dev]"
+      - run: python -m pytest -q
+      - run: python -m compileall -q src tests
+      - run: python -m src.main --demo --audit-file audit/ci-demo.jsonl
+      - run: python -m src.main --staging-suite --dry-run --staging-report audit/staging-dry-run.json
